@@ -1,0 +1,4 @@
+*.skel.h
+*.skel.rs
+vmlinux.h
+compile_commands.json
