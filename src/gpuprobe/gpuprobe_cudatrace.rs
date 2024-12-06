@@ -5,7 +5,7 @@ mod gpuprobe {
     ));
 }
 
-use libbpf_rs::{MapCore, MapFlags};
+use libbpf_rs::{MapCore, MapFlags, UprobeOpts};
 
 use super::uprobe_data::CudaTraceData;
 use super::{Gpuprobe, GpuprobeError, LIBCUDART_PATH};
@@ -15,12 +15,18 @@ impl Gpuprobe {
     /// attaches uprobes for the cudatrace program, or returns an error on
     /// failure
     pub fn attach_cudatrace_uprobes(&mut self) -> Result<(), GpuprobeError> {
+        let opts_launch_kernel = UprobeOpts {
+            func_name: "cudaLaunchKernel".to_string(),
+            retprobe: false,
+            ..Default::default()
+        };
+
         let cuda_launch_kernel_uprobe_link = self
             .skel
             .skel
             .progs
             .trace_cuda_launch_kernel
-            .attach_uprobe(false, -1, LIBCUDART_PATH, 0x0000000000074440)
+            .attach_uprobe_with_opts(-1, LIBCUDART_PATH, 0, opts_launch_kernel)
             .map_err(|_| GpuprobeError::AttachError)?;
 
         self.links.links.trace_cuda_launch_kernel = Some(cuda_launch_kernel_uprobe_link);
