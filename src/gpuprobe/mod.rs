@@ -2,11 +2,12 @@ pub mod gpuprobe_bandwidth_util;
 pub mod gpuprobe_cudatrace;
 pub mod gpuprobe_memleak;
 pub mod metrics;
+pub mod process_state;
 pub mod uprobe_data;
 
 use chrono::Local;
 use metrics::GpuprobeMetrics;
-use std::mem::MaybeUninit;
+use std::{collections::HashMap, mem::MaybeUninit};
 
 use libbpf_rs::{
     skel::{OpenSkel, SkelBuilder},
@@ -21,8 +22,8 @@ mod gpuprobe {
 }
 use gpuprobe::*;
 
-use self::gpuprobe_memleak::MemleakState;
 use self::metrics::AddrLabel;
+use self::{gpuprobe_memleak::MemleakState, process_state::GlobalProcessTable};
 
 const LIBCUDART_PATH: &str = "/usr/local/cuda/lib64/libcudart.so";
 
@@ -63,6 +64,8 @@ pub struct Gpuprobe {
     opts: Opts,
     pub metrics: GpuprobeMetrics,
     memleak_state: MemleakState,
+    /// maps pid to a symbol table - cached for quick symbolic resolution
+    glob_process_table: GlobalProcessTable,
 }
 
 #[derive(Clone, Debug)]
@@ -104,6 +107,7 @@ impl Gpuprobe {
             opts,
             metrics,
             memleak_state: MemleakState::new(),
+            glob_process_table: GlobalProcessTable::new(),
         })
     }
 

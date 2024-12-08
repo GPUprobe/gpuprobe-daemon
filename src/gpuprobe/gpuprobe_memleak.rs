@@ -96,6 +96,7 @@ impl Gpuprobe {
                     ));
                 }
             };
+            self.glob_process_table.create_entry(event.pid)?;
             self.memleak_state.handle_event(event)?;
         }
         Ok(())
