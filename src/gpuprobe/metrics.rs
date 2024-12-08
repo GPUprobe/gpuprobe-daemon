@@ -15,6 +15,13 @@ pub struct MemleakLabelSet {
     pub offset: u64,
 }
 
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
+pub struct CudatraceLabelSet {
+    pub pid: u32,
+    pub kernel_offset: u64,
+    pub kernel_symbol: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct GpuprobeMetrics {
     opts: Opts,
@@ -22,7 +29,7 @@ pub struct GpuprobeMetrics {
     pub num_mallocs: Gauge,
     pub memleaks: Family<MemleakLabelSet, Gauge>,
     // cuda trace
-    pub kernel_launches: Family<AddrLabel, Gauge>,
+    pub kernel_launches: Family<CudatraceLabelSet, Gauge>,
 }
 
 impl GpuprobeMetrics {

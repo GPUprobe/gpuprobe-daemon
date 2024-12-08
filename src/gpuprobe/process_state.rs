@@ -5,7 +5,7 @@ use goblin::Object;
 use proc_maps::get_process_maps;
 
 pub struct GlobalProcessTable {
-    per_process_tables: HashMap<u32, ProcessState>,
+    per_process_tables: HashMap<u32, Option<ProcessState>>,
 }
 
 impl GlobalProcessTable {
@@ -26,7 +26,10 @@ impl GlobalProcessTable {
             return Ok(());
         }
 
-        let new_entry = ProcessState::new(pid)?;
+        let new_entry = match ProcessState::new(pid) {
+            Ok(entry) => Some(entry),
+            Err(_) => None,
+        };
         self.per_process_tables.insert(pid, new_entry);
         Ok(())
     }
@@ -46,15 +49,20 @@ impl GlobalProcessTable {
                 return None;
             }
         };
-
-        proc_state.resolve_symbol_text_offset(virtual_offset)
+        match proc_state {
+            Some(proc_state) => proc_state.resolve_symbol_text_offset(virtual_offset),
+            None => None,
+        }
     }
 }
 
 impl std::fmt::Display for GlobalProcessTable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (_, table) in self.per_process_tables.iter() {
-            write!(f, "{table}")?;
+            match table {
+                Some(table) => write!(f, "{table}")?,
+                None => write!(f, "NO PROCESS TABLE")?,
+            }
         }
         Ok(())
     }

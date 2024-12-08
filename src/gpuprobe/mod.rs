@@ -4,11 +4,10 @@ pub mod gpuprobe_memleak;
 pub mod metrics;
 pub mod process_state;
 pub mod uprobe_data;
-pub mod process_state;
 
 use chrono::Local;
 use metrics::GpuprobeMetrics;
-use std::{collections::HashMap, mem::MaybeUninit};
+use std::mem::MaybeUninit;
 
 use libbpf_rs::{
     skel::{OpenSkel, SkelBuilder},
@@ -23,11 +22,7 @@ mod gpuprobe {
 }
 use gpuprobe::*;
 
-<<<<<<< HEAD
-=======
-use self::{gpuprobe_memleak::MemleakState, process_state::GlobalProcessTable};
->>>>>>> d20352d (Added struct definition for parsing process state from a PID. This will)
-use self::metrics::AddrLabel;
+use self::gpuprobe_cudatrace::CudatraceState;
 use self::{gpuprobe_memleak::MemleakState, process_state::GlobalProcessTable};
 
 const LIBCUDART_PATH: &str = "/usr/local/cuda/lib64/libcudart.so";
@@ -69,6 +64,7 @@ pub struct Gpuprobe {
     opts: Opts,
     pub metrics: GpuprobeMetrics,
     memleak_state: MemleakState,
+    cudatrace_state: CudatraceState,
     /// maps pid to a symbol table - cached for quick symbolic resolution
     glob_process_table: GlobalProcessTable,
 }
@@ -112,6 +108,7 @@ impl Gpuprobe {
             opts,
             metrics,
             memleak_state: MemleakState::new(),
+            cudatrace_state: CudatraceState::new(),
             glob_process_table: GlobalProcessTable::new(),
         })
     }
@@ -139,25 +136,30 @@ impl Gpuprobe {
                         .set(alloc.size as i64);
                 }
             }
-            //for (addr, count) in memleak_state.outstanding_allocs {
-            //    self.metrics
-            //        .memleaks
-            //        .get_or_create(&AddrLabel { addr })
-            //        .set(count as i64);
-            //}
-        }
-        // updates kernel launch stats
-        if self.opts.cudatrace {
-            let cudatrace_data = self.collect_data_cudatrace()?;
-            for (addr, count) in cudatrace_data.kernel_frequencies_histogram {
-                self.metrics
-                    .kernel_launches
-                    .get_or_create(&AddrLabel { addr })
-                    .set(count as i64);
-            }
         }
 
-        // !!TODO update bandwidth statistics as well
+        if self.opts.cudatrace {
+            self.consume_cudatrace_events()?;
+
+            for (pid, b_tree_map) in self.cudatrace_state.kernel_freq_hist.iter() {
+                for (offset, count) in b_tree_map.iter() {
+                    self.metrics
+                        .kernel_launches
+                        .get_or_create(&metrics::CudatraceLabelSet {
+                            pid: pid.clone(),
+                            kernel_offset: *offset,
+                            kernel_symbol: match self
+                                .glob_process_table
+                                .resolve_symbol_text_offset(*pid, *offset)
+                            {
+                                Some(symbol) => symbol,
+                                None => "unknown kernel".to_string(),
+                            },
+                        })
+                        .set(*count as i64);
+                }
+            }
+        }
         Ok(())
     }
 
@@ -176,8 +178,26 @@ impl Gpuprobe {
             print!("{}", self.memleak_state);
         }
         if self.opts.cudatrace {
-            let cudatrace_data = self.collect_data_cudatrace()?;
-            println!("{}", cudatrace_data);
+            self.consume_cudatrace_events()?;
+            println!(
+                "total kernel launches: {}",
+                self.cudatrace_state.total_kernel_launches
+            );
+
+            for (pid, b_tree_map) in self.cudatrace_state.kernel_freq_hist.iter() {
+                println!("pid: {pid}");
+                for (addr, count) in b_tree_map.iter() {
+                    let resolved = match self
+                        .glob_process_table
+                        .resolve_symbol_text_offset(*pid, *addr)
+                    {
+                        None => "unknown kernel".to_string(),
+                        Some(str) => str,
+                    };
+                    let formatted = format!("0x{:x} ({})", addr, resolved);
+                    println!("\t{:30} -> {}", formatted, count);
+                }
+            }
         }
         if self.opts.bandwidth_util {
             let bandwidth_util_data = self.collect_data_bandwidth_util()?;
