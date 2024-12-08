@@ -4,6 +4,7 @@ pub mod gpuprobe_memleak;
 pub mod metrics;
 pub mod process_state;
 pub mod uprobe_data;
+pub mod process_state;
 
 use chrono::Local;
 use metrics::GpuprobeMetrics;
@@ -22,6 +23,10 @@ mod gpuprobe {
 }
 use gpuprobe::*;
 
+<<<<<<< HEAD
+=======
+use self::{gpuprobe_memleak::MemleakState, process_state::GlobalProcessTable};
+>>>>>>> d20352d (Added struct definition for parsing process state from a PID. This will)
 use self::metrics::AddrLabel;
 use self::{gpuprobe_memleak::MemleakState, process_state::GlobalProcessTable};
 
