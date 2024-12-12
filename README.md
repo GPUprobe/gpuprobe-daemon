@@ -48,73 +48,30 @@ Grafana.
 These metrics are also displayed periodically to stdout.
 
 ```
-sudo ./gpu_probe --memleak --display-interval 3 --metrics-addr 0.0.0.0:9000
-========================
-2024-12-02 12:36:56
+2024-12-12 16:32:46
 
-num_successful_mallocs:  0
-num_failed_mallocs:      0
-num_successful_frees:    0
-num_failed_frees:        0
-per-process memory maps:
-
-========================
-========================
-2024-12-02 12:36:59
-
-num_successful_mallocs:  3
-num_failed_mallocs:      0
-num_successful_frees:    0
-num_failed_frees:        0
-per-process memory maps:
-process 246649
-        0x00007989d8000000: 8000000 Bytes
-        0x00007989dcc00000: 8000000 Bytes
-        0x00007989dd400000: 8000000 Bytes
-
-========================
-========================
-2024-12-02 12:37:11
-
-num_successful_mallocs:  3
-num_failed_mallocs:      0
-num_successful_frees:    0
-num_failed_frees:        0
-per-process memory maps:
-process 246649
-        0x00007989d8000000: 8000000 Bytes
-        0x00007989dcc00000: 8000000 Bytes
-        0x00007989dd400000: 8000000 Bytes
-
-========================
-========================
-2024-12-02 12:37:14
-
-num_successful_mallocs:  3
+num_successful_mallocs:  6
 num_failed_mallocs:      0
 num_successful_frees:    2
 num_failed_frees:        0
 per-process memory maps:
-process 246649
-        0x00007989d8000000: 8000000 Bytes
-        0x00007989dcc00000: 0 Bytes
-        0x00007989dd400000: 0 Bytes
+process 365159
+        0x0000793a44000000: 8000000 Bytes
+        0x0000793a48c00000: 8000000 Bytes
+        0x0000793a49400000: 8000000 Bytes
+process 365306
+        0x000078fd20000000: 8000000 Bytes
+        0x000078fd24c00000: 0 Bytes
+        0x000078fd25400000: 0 Bytes
 
-========================
-========================
-2024-12-02 12:37:17
+total kernel launches: 1490
+pid: 365306
+        0x5823e39efa50 (unknown kernel) -> 10
+        0x5823e39efb30 (unknown kernel) -> 10
+pid: 365159
+        0x5de98f9fba50 (_Z27optimized_convolution_part1PdS_i) -> 735
+        0x5de98f9fbb30 (_Z27optimized_convolution_part2PdS_i) -> 735
 
-num_successful_mallocs:  3
-num_failed_mallocs:      0
-num_successful_frees:    2
-num_failed_frees:        0
-per-process memory maps:
-process 246649
-        0x00007989d8000000: 0 Bytes # note: this allocation is freed by process terminating
-        0x00007989dcc00000: 0 Bytes
-        0x00007989dd400000: 0 Bytes
-
-========================
 ```
 
 The various features are opt-in via command-line arguments passed to the 
