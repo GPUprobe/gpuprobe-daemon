@@ -1,6 +1,6 @@
 use libbpf_rs::{MapCore, MapFlags, UprobeOpts};
 
-use super::{Gpuprobe, GpuprobeError, LIBCUDART_PATH};
+use super::{Gpuprobe, GpuprobeError};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// contains implementation for the memleak program
@@ -37,7 +37,7 @@ impl Gpuprobe {
             .skel
             .progs
             .memleak_cuda_malloc
-            .attach_uprobe_with_opts(-1, LIBCUDART_PATH, 0, opts_malloc)
+            .attach_uprobe_with_opts(-1, &self.opts.libcudart_path, 0, opts_malloc)
             .map_err(|_| GpuprobeError::AttachError)?;
 
         let cuda_malloc_uretprobe_link = self
@@ -45,7 +45,7 @@ impl Gpuprobe {
             .skel
             .progs
             .memleak_cuda_malloc_ret
-            .attach_uprobe_with_opts(-1, LIBCUDART_PATH, 0, opts_malloc_ret)
+            .attach_uprobe_with_opts(-1, &self.opts.libcudart_path, 0, opts_malloc_ret)
             .map_err(|_| GpuprobeError::AttachError)?;
 
         let cuda_free_uprobe_link = self
@@ -53,7 +53,7 @@ impl Gpuprobe {
             .skel
             .progs
             .trace_cuda_free
-            .attach_uprobe_with_opts(-1, LIBCUDART_PATH, 0, opts_free)
+            .attach_uprobe_with_opts(-1, &self.opts.libcudart_path, 0, opts_free)
             .map_err(|_| GpuprobeError::AttachError)?;
 
         let cuda_free_uretprobe_link = self
@@ -61,7 +61,7 @@ impl Gpuprobe {
             .skel
             .progs
             .trace_cuda_free_ret
-            .attach_uprobe_with_opts(-1, LIBCUDART_PATH, 0, opts_free_ret)
+            .attach_uprobe_with_opts(-1, &self.opts.libcudart_path, 0, opts_free_ret)
             .map_err(|_| GpuprobeError::AttachError)?;
 
         self.links.links.memleak_cuda_malloc = Some(cuda_malloc_uprobe_link);

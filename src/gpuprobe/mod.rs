@@ -25,8 +25,6 @@ use gpuprobe::*;
 use self::gpuprobe_cudatrace::CudatraceState;
 use self::{gpuprobe_memleak::MemleakState, process_state::GlobalProcessTable};
 
-const LIBCUDART_PATH: &str = "/usr/local/cuda/lib64/libcudart.so";
-
 pub struct SafeGpuprobeLinks {
     links: GpuprobeLinks,
 }
@@ -74,6 +72,7 @@ pub struct Opts {
     pub memleak: bool,
     pub cudatrace: bool,
     pub bandwidth_util: bool,
+    pub libcudart_path: String,
 }
 
 const DEFAULT_LINKS: GpuprobeLinks = GpuprobeLinks {

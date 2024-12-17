@@ -32,6 +32,9 @@ struct Args {
     /// Interval in seconds for displaying metrics to stdout.
     #[arg(long, default_value_t = 5)]
     display_interval: u64,
+
+    #[arg(long, default_value = "/usr/local/cuda/lib64/libcudart.so")]
+    libcudart_path: String,
 }
 
 #[derive(Clone)]
@@ -47,6 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         memleak: args.memleak,
         cudatrace: args.cudatrace,
         bandwidth_util: args.bandwidth_util,
+        libcudart_path: args.libcudart_path,
     };
 
     let mut gpuprobe = gpuprobe::Gpuprobe::new(opts).unwrap();
