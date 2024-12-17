@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use libbpf_rs::{MapCore, UprobeOpts};
 
-use super::{Gpuprobe, GpuprobeError, LIBCUDART_PATH};
+use super::{Gpuprobe, GpuprobeError};
 
 /// contains implementations for the cudatrace program
 impl Gpuprobe {
@@ -27,7 +27,7 @@ impl Gpuprobe {
             .skel
             .progs
             .trace_cuda_launch_kernel
-            .attach_uprobe_with_opts(-1, LIBCUDART_PATH, 0, opts_launch_kernel)
+            .attach_uprobe_with_opts(-1, &self.opts.libcudart_path, 0, opts_launch_kernel)
             .map_err(|_| GpuprobeError::AttachError)?;
 
         self.links.links.trace_cuda_launch_kernel = Some(cuda_launch_kernel_uprobe_link);

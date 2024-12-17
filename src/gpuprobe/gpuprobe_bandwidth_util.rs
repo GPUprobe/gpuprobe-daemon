@@ -8,7 +8,7 @@ mod gpuprobe {
 use libbpf_rs::{MapCore, UprobeOpts};
 
 use super::uprobe_data::BandwidthUtilData;
-use super::{Gpuprobe, GpuprobeError, LIBCUDART_PATH};
+use super::{Gpuprobe, GpuprobeError};
 
 impl Gpuprobe {
     /// attaches uprobes for the bandwidth util program, or returns an error on
@@ -31,7 +31,7 @@ impl Gpuprobe {
             .skel
             .progs
             .trace_cuda_memcpy
-            .attach_uprobe_with_opts(-1, LIBCUDART_PATH, 0, opts_memcpy)
+            .attach_uprobe_with_opts(-1, &self.opts.libcudart_path, 0, opts_memcpy)
             .map_err(|_| GpuprobeError::AttachError)?;
 
         let cuda_memcpy_uretprobe_link = self
@@ -39,7 +39,7 @@ impl Gpuprobe {
             .skel
             .progs
             .trace_cuda_memcpy_ret
-            .attach_uprobe_with_opts(-1, LIBCUDART_PATH, 0, opts_memcpy_ret)
+            .attach_uprobe_with_opts(-1, &self.opts.libcudart_path, 0, opts_memcpy_ret)
             .map_err(|_| GpuprobeError::AttachError)?;
 
         self.links.links.trace_cuda_memcpy = Some(cuda_memcpy_uprobe_link);
