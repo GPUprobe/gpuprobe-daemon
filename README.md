@@ -44,15 +44,17 @@ Usage: gpu_probe [OPTIONS]
 
 Options:
       --memleak
-          Detects leaking calls to cudaMalloc from the CUDA runtime API
+          Attaches memleak program: detects leaking calls to cudaMalloc from the CUDA runtime API
       --cudatrace
-          Maintains a histogram on frequencies of cuda kernel launches
+          Attaches the cudatrace program: maintains per-process histograms of cuda kernel launches and their frequencies
       --bandwidth-util
-          Approximates bandwidth utilization of cudaMemcpy
+          Attaches the bandwidth util program: approximates bandwidth utilization of cudaMemcpy
       --metrics-addr <METRICS_ADDR>
           Address for the Prometheus metrics endpoint [default: 0.0.0.0:9000]
       --display-interval <DISPLAY_INTERVAL>
           Interval in seconds for displaying metrics to stdout [default: 5]
+      --libcudart-path <LIBCUDART_PATH>
+          The path of the libcudart.so dynamic lib that is monitored [default: /usr/local/cuda/lib64/libcudart.so]
   -h, --help
           Print help
   -V, --version

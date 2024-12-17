@@ -13,15 +13,18 @@ use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::ge
 #[derive(Parser)]
 #[command(author, version, about, long_about = None, arg_required_else_help = true)]
 struct Args {
-    /// Detects leaking calls to cudaMalloc from the CUDA runtime API.
+    /// Attaches memleak program: detects leaking calls to cudaMalloc from the
+    /// CUDA runtime API.
     #[arg(long, exclusive = false)]
     memleak: bool,
 
-    /// Maintains a histogram on frequencies of cuda kernel launches.
+    /// Attaches the cudatrace program: maintains per-process histograms of
+    /// cuda kernel launches and their frequencies
     #[arg(long, exclusive = false)]
     cudatrace: bool,
 
-    /// Approximates bandwidth utilization of cudaMemcpy.
+    /// Attaches the bandwidth util program: approximates bandwidth utilization
+    /// of cudaMemcpy.
     #[arg(long, exclusive = false)]
     bandwidth_util: bool,
 
@@ -33,6 +36,7 @@ struct Args {
     #[arg(long, default_value_t = 5)]
     display_interval: u64,
 
+    /// The path of the libcudart.so dynamic lib that is monitored.
     #[arg(long, default_value = "/usr/local/cuda/lib64/libcudart.so")]
     libcudart_path: String,
 }
