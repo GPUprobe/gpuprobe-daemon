@@ -154,30 +154,30 @@ int trace_cuda_free_ret(struct pt_regs *ctx)
 	return bpf_map_push_elem(&memleak_events_queue, e, 0);
 }
 
-/**
- * maps a kernel function address to the number of times it has been called
- */
+struct kernel_launch_event {
+	__u64 timestamp;
+	__u64 kern_offset;
+	__u32 pid;
+};
+
 struct {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, void *);
-	__type(value, size_t);
+	__uint(type, BPF_MAP_TYPE_QUEUE);
+	__uint(key_size, 0);
+	__type(value, struct kernel_launch_event);
 	__uint(max_entries, 10240);
-} kernel_calls_hist SEC(".maps");
+} kernel_launch_events_queue SEC(".maps");
 
 SEC("uprobe/cudaKernelLaunch")
 int trace_cuda_launch_kernel(struct pt_regs *ctx)
 {
-	void *func;
-	u64 one = 1;
-	size_t *num_launches;
+	struct kernel_launch_event e;
+	void *kern_offset;
 
-	func = (void *)PT_REGS_PARM1(ctx);
-	if (!(num_launches = bpf_map_lookup_elem(&kernel_calls_hist, &func))) {
-		bpf_map_update_elem(&kernel_calls_hist, &func, &one, 0);
-	} else {
-		__sync_fetch_and_add(num_launches, 1);
-	}
-	return 0;
+	e.timestamp = bpf_ktime_get_ns();
+	e.kern_offset = (__u64)PT_REGS_PARM1(ctx);
+	e.pid = (__u32)bpf_get_current_pid_tgid();
+
+	return bpf_map_push_elem(&kernel_launch_events_queue, &e, 0);
 }
 
 /**
