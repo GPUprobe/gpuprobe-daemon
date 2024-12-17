@@ -4,12 +4,35 @@ GPUprobe *(GPU probe, GP-uprobe)* provides utilities for observability
 of GPU behavior via their interaction with the Cuda runtime API by leveraging 
 eBPF uprobes.
 
-This repo provides the source code for `gpuprobe-daemon` - a lightweight binary
-that collects data on the CUDA runtime by leveraging eBPF uprobes _(user-space 
-probes)_.
+## Motivation
 
-The project, although experimental, provides several cool features already
-which are described below.
+GPU monitoring and debugging traditionally requires either heavyweight 
+profiling tools like Nsight (which significantly impacts performance), or 
+high-level monitoring solutions like DCGM (which lack granular insights into 
+application behavior). This creates a gap for developers who need detailed GPU 
+runtime information without the overhead of full profiling or code 
+instrumentation.
+
+GPUprobe fills this gap by leveraging [eBPF](https://ebpf.io/) to provide:
+
+- Real-time memory leak detection at the CUDA runtime level
+- Kernel launch frequency tracking
+- Memory bandwidth utilization metrics
+
+The key advantage of GPUprobe's approach is that it requires zero modification 
+to existing code bases. Whether you're running production ML pipelines, 
+handling complex GPU computations, or debugging CUDA applications, GPUprobe can 
+monitor multiple running processes calling the CUDA runtime API and provide 
+granular insights without any changes to your CUDA kernels or application code.
+
+By hooking directly into the CUDA runtime API through eBPF uprobes, GPUprobe 
+maintains a lightweight footprint while still offering detailed observability 
+into GPU behavior - making it suitable for both development and production 
+environments.
+
+This repository provides the source code for `gpuprobe-daemon` - a lightweight 
+binary that implements these capabilities. While the project is experimental, 
+it already offers several powerful features described below.
 
 For information on building and running, refer to the 
 [short guide](#building-and-running) on the subject.
