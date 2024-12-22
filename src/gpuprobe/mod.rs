@@ -1,3 +1,4 @@
+pub mod cuda_error;
 pub mod gpuprobe_bandwidth_util;
 pub mod gpuprobe_cudatrace;
 pub mod gpuprobe_memleak;
@@ -22,7 +23,7 @@ mod gpuprobe {
 }
 use gpuprobe::*;
 
-use self::gpuprobe_cudatrace::CudatraceState;
+use self::{cuda_error::CudaErrorState, gpuprobe_cudatrace::CudatraceState};
 use self::{gpuprobe_memleak::MemleakState, process_state::GlobalProcessTable};
 
 pub struct SafeGpuprobeLinks {
@@ -65,6 +66,7 @@ pub struct Gpuprobe {
     cudatrace_state: CudatraceState,
     /// maps pid to a symbol table - cached for quick symbolic resolution
     glob_process_table: GlobalProcessTable,
+    err_state: CudaErrorState,
 }
 
 #[derive(Clone, Debug)]
@@ -109,6 +111,7 @@ impl Gpuprobe {
             memleak_state: MemleakState::new(),
             cudatrace_state: CudatraceState::new(),
             glob_process_table: GlobalProcessTable::new(),
+            err_state: CudaErrorState::new(),
         })
     }
 
@@ -119,10 +122,6 @@ impl Gpuprobe {
             // todo GC cycle for cleaning up memory maps??
             self.memleak_state.cleanup_terminated_processes()?;
             self.consume_memleak_events()?;
-
-            self.metrics
-                .num_mallocs
-                .set(self.memleak_state.num_successful_mallocs as i64);
 
             for (pid, b_tree_map) in self.memleak_state.memory_map.iter() {
                 for (_, alloc) in b_tree_map {
@@ -159,6 +158,25 @@ impl Gpuprobe {
                 }
             }
         }
+
+        // we use `opts.memleak || self.opts.cudatrace` as a proxy for an
+        // implicit option for collecting errors. By placing this at the end,
+        // we ensure that all relevant events have been handled this iteration
+        if self.opts.memleak || self.opts.cudatrace {
+            for (pid, hash_map) in self.err_state.error_histogram.iter() {
+                for ((event_type, err), count) in hash_map.iter() {
+                    self.metrics
+                        .err_hist
+                        .get_or_create(&metrics::ErrorLabelSet {
+                            pid: *pid,
+                            call_type: event_type.to_string(),
+                            return_code: *err as u32,
+                        })
+                        .set(*count as i64);
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -198,6 +216,10 @@ impl Gpuprobe {
                 }
             }
         }
+        if self.opts.memleak || self.opts.cudatrace {
+            println!("\n{}", self.err_state);
+        }
+
         if self.opts.bandwidth_util {
             let bandwidth_util_data = self.collect_data_bandwidth_util()?;
             println!("{}", bandwidth_util_data);

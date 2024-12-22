@@ -1,6 +1,9 @@
-use libbpf_rs::{MapCore, MapFlags, UprobeOpts};
+use libbpf_rs::{MapCore, UprobeOpts};
 
-use super::{Gpuprobe, GpuprobeError};
+use super::{
+    cuda_error::{CudaError, CudaErrorT},
+    Gpuprobe, GpuprobeError,
+};
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 /// contains implementation for the memleak program
@@ -96,8 +99,24 @@ impl Gpuprobe {
                     ));
                 }
             };
-            self.glob_process_table.create_entry(event.pid)?;
-            self.memleak_state.handle_event(event)?;
+
+            match event.is_error() {
+                false => {
+                    self.glob_process_table.create_entry(event.pid)?;
+                    self.memleak_state.handle_event(event)?;
+                }
+                true => {
+                    let err = CudaError {
+                        pid: event.pid,
+                        event: match event.event_type {
+                            0 => super::cuda_error::EventType::CudaMalloc,
+                            _ => super::cuda_error::EventType::CudaFree,
+                        },
+                        error: CudaErrorT::from_int(event.ret),
+                    };
+                    self.err_state.insert(err)?;
+                }
+            }
         }
         Ok(())
     }
@@ -133,14 +152,14 @@ impl MemleakState {
     ///     - number of failures
     fn handle_event(&mut self, data: MemleakEvent) -> Result<(), GpuprobeError> {
         self.active_pids.insert(data.pid.clone());
-        if data.event_type == MemleakEventType::CudaMalloc as i32 {
-            if data.ret != 0 {
-                self.num_failed_mallocs += 1;
-                return Ok(());
-            } else {
-                self.num_successful_mallocs += 1;
-            }
+        if data.is_error() {
+            // this case should be updated when we consume the memleak
+            // queue - a MemleakState only holds updates made by valid
+            // cudaMalloc / cudaFree calls
+            panic!("handle_event should not handle erroneous calls");
+        }
 
+        if data.event_type == MemleakEventType::CudaMalloc as i32 {
             if !self.memory_map.contains_key(&data.pid) {
                 self.memory_map.insert(data.pid, BTreeMap::new());
             }
@@ -160,13 +179,6 @@ impl MemleakState {
                 },
             );
         } else if data.event_type == MemleakEventType::CudaFree as i32 {
-            if data.ret != 0 {
-                self.num_failed_frees += 1;
-                return Ok(());
-            } else {
-                self.num_successful_frees += 1;
-            }
-
             if !self.memory_map.contains_key(&data.pid) {
                 // Freeing data that isn't allocated. This represents a problem
                 // in the user code, or in our own tracking of memory
@@ -242,6 +254,8 @@ impl MemleakState {
             use nix::sys::signal::kill;
             use nix::unistd::Pid;
 
+            // We send a kill signal with value 0 to the pid. This functions as
+            // an aliveness probe.
             match kill(Pid::from_raw(pid as i32), None) {
                 Ok(_) => Ok(false),
                 Err(nix::errno::Errno::ESRCH) => Ok(true),
@@ -253,15 +267,6 @@ impl MemleakState {
 
 impl std::fmt::Display for MemleakState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "num_successful_mallocs:  {}",
-            self.num_successful_mallocs
-        )?;
-        writeln!(f, "num_failed_mallocs:      {}", self.num_failed_mallocs)?;
-        writeln!(f, "num_successful_frees:    {}", self.num_successful_frees)?;
-        writeln!(f, "num_failed_frees:        {}", self.num_failed_frees)?;
-
         writeln!(f, "per-process memory maps:")?;
         for (pid, b_tree_map) in self.memory_map.iter() {
             writeln!(f, "process {}", pid)?;
@@ -301,6 +306,11 @@ impl MemleakEvent {
         // 1. The byte array contains valid data for this struct
         // 2. The byte array is at least as large as the struct
         unsafe { Some(std::ptr::read_unaligned(bytes.as_ptr() as *const Self)) }
+    }
+
+    /// Returns true iff the event is an error
+    pub fn is_error(&self) -> bool {
+        self.ret != CudaErrorT::CudaSuccess as i32
     }
 }
 
