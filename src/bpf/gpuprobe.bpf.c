@@ -15,11 +15,10 @@ enum memleak_event_t {
 struct memleak_event {
 	__u64 start;
 	__u64 end;
-	void *device_addr;
+	__u64 device_addr;
 	__u64 size;
 	__u32 pid;
-	/// contains the allocation size if event_type == CUDA_MALLOC
-	int32 ret;
+	__s32 ret;
 	enum memleak_event_t event_type;
 };
 
@@ -33,15 +32,15 @@ struct memleak_event {
  */
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, u32);
+	__type(key, __u32);
 	__type(value, struct memleak_event);
 	__uint(max_entries, 1024);
 } memleak_pid_to_event SEC(".maps");
 
 struct {
 	__uint(type, BPF_MAP_TYPE_HASH);
-	__type(key, u32);
-	__type(value, void **);
+	__type(key, __u32);
+	__type(value, __u64);
 	__uint(max_entries, 1024);
 } memleak_pid_to_dev_ptr SEC(".maps");
 
@@ -61,12 +60,12 @@ SEC("uprobe/cudaMalloc")
 int memleak_cuda_malloc(struct pt_regs *ctx)
 {
 	struct memleak_event e = { 0 };
-	void **dev_ptr;
-	u32 pid, key0 = 0;
+	__u64 dev_ptr;
+	__u32 pid, key0 = 0;
 
-	e.size = (size_t)PT_REGS_PARM2(ctx);
-	dev_ptr = (void **)PT_REGS_PARM1(ctx);
-	pid = (u32)bpf_get_current_pid_tgid();
+	e.size = (__u64)PT_REGS_PARM2(ctx);
+	dev_ptr = (__u64) PT_REGS_PARM1(ctx);
+	pid = (__u32)bpf_get_current_pid_tgid();
 
 	e.event_type = CUDA_MALLOC;
 	e.start = bpf_ktime_get_ns();
@@ -83,15 +82,13 @@ int memleak_cuda_malloc(struct pt_regs *ctx)
 SEC("uretprobe/cudaMalloc")
 int memleak_cuda_malloc_ret(struct pt_regs *ctx)
 {
-	int cuda_malloc_ret;
-	u32 pid, key0 = 0;
-	size_t *size, *num_failures;
+	__s32 cuda_malloc_ret;
+	__u32 pid;
 	struct memleak_event *e;
-	void **dev_ptr;
-	void ***map_ptr;
+	__u64 dev_ptr, map_ptr;
 
-	cuda_malloc_ret = (int)PT_REGS_RC(ctx);
-	pid = (u32)bpf_get_current_pid_tgid();
+	cuda_malloc_ret = (__s32)PT_REGS_RC(ctx);
+	pid = (__u32)bpf_get_current_pid_tgid();
 
 	e = bpf_map_lookup_elem(&memleak_pid_to_event, &pid);
 	if (!e) {
@@ -101,14 +98,14 @@ int memleak_cuda_malloc_ret(struct pt_regs *ctx)
 	e->ret = cuda_malloc_ret;
 
 	// lookup the value of `devPtr` passed to `cudaMalloc` by this process
-	map_ptr = (void ***)bpf_map_lookup_elem(&memleak_pid_to_dev_ptr, &pid);
+	map_ptr = (__u64)bpf_map_lookup_elem(&memleak_pid_to_dev_ptr, &pid);
 	if (!map_ptr) {
 		return -1;
 	}
-	dev_ptr = *map_ptr;
+	dev_ptr = *(__u64*)map_ptr;
 
 	// read the value copied into `*devPtr` by `cudaMalloc` from userspace
-	if (bpf_probe_read_user(&e->device_addr, sizeof(void *), dev_ptr)) {
+	if (bpf_probe_read_user(&e->device_addr, sizeof(void *), (void*)dev_ptr)) {
 		return -1;
 	}
 
@@ -126,7 +123,7 @@ int trace_cuda_free(struct pt_regs *ctx)
 	e.event_type = CUDA_FREE;
 	e.pid = (u32)bpf_get_current_pid_tgid();
 	e.start = bpf_ktime_get_ns();
-	e.device_addr = (void **)PT_REGS_PARM1(ctx);
+	e.device_addr = (__u64)PT_REGS_PARM1(ctx);
 
 	return bpf_map_update_elem(&memleak_pid_to_event, &e.pid, &e, 0);
 }
@@ -135,12 +132,11 @@ int trace_cuda_free(struct pt_regs *ctx)
 SEC("uretprobe/cudaFree")
 int trace_cuda_free_ret(struct pt_regs *ctx)
 {
-	int cuda_free_ret;
-	u32 pid;
+	__s32 cuda_free_ret;
+	__u32 pid;
 	struct memleak_event *e;
-	size_t zero = 0;
 
-	pid = (u32)bpf_get_current_pid_tgid();
+	pid = (__u32)bpf_get_current_pid_tgid();
 
 	e = (struct memleak_event *)bpf_map_lookup_elem(&memleak_pid_to_event,
 							&pid);
@@ -194,9 +190,9 @@ enum memcpy_kind {
 struct cuda_memcpy {
 	__u64 start_time;
 	__u64 end_time;
-	void *dst;
-	void *src;
-	size_t count;
+	__u64 dst;
+	__u64 src;
+	__u64 count;
 	enum memcpy_kind kind;
 };
 
@@ -230,9 +226,9 @@ struct {
 SEC("uprobe/cudaMemcpy")
 int trace_cuda_memcpy(struct pt_regs *ctx)
 {
-	void *dst = (void *)PT_REGS_PARM1(ctx);
-	void *src = (void *)PT_REGS_PARM2(ctx);
-	size_t count = PT_REGS_PARM3(ctx);
+	__u64 dst = PT_REGS_PARM1(ctx);
+	__u64 src = PT_REGS_PARM2(ctx);
+	__u64 count = PT_REGS_PARM3(ctx);
 	enum memcpy_kind kind = PT_REGS_PARM4(ctx);
 	__u32 pid = (__u32)bpf_get_current_pid_tgid();
 
@@ -265,7 +261,6 @@ int trace_cuda_memcpy_ret(struct pt_regs *ctx)
 	struct cuda_memcpy *exited_memcpy;
 
 	if (ret) {
-		bpf_printk("failed to cudaMemcpy");
 		return -1;
 	}
 
