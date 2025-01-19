@@ -61,14 +61,23 @@ Options:
           Print version
 ```
 
-## High-level Design
+## Intended use-case
 
 Metrics are exported in [OpenMetrics](https://github.com/prometheus/OpenMetrics/blob/main/specification/OpenMetrics.md) 
 format via an http handler, which is intended to be scraped by Prometheus. This
 allows for seamless integration with your favorite observability stack, e.g.
 Grafana.
 
-![Grafana plotting aggregated Cuda memory leaks](readme-assets/memleaks-grafana.png)
+![Simple `memleak` visualization in Grafana](readme-assets/memleak-19-01.png)
+
+`memleak:` memory maps displayed for a process' memory allocations in real-time
+alongside an aggregate seen in orange representing the process' total CUDA
+memory utilization.
+
+![Simple `cudatrace` visualization in Grafana](readme-assets/cudatrace-19-01.png)
+
+`cudatrace:` kernel launches made by a process shown in real time, with kernel 
+names resolved for better readability 
 
 These metrics are also displayed periodically to stdout.
 
