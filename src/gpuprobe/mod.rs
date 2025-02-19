@@ -1,6 +1,7 @@
 pub mod gpuprobe_bandwidth_util;
 pub mod gpuprobe_cudatrace;
 pub mod gpuprobe_memleak;
+pub mod gpuprobe_deps;
 pub mod metrics;
 pub mod process_state;
 pub mod uprobe_data;
@@ -72,6 +73,7 @@ pub struct Opts {
     pub memleak: bool,
     pub cudatrace: bool,
     pub bandwidth_util: bool,
+    pub deps: bool,
     pub libcudart_path: String,
 }
 
@@ -83,6 +85,8 @@ const DEFAULT_LINKS: GpuprobeLinks = GpuprobeLinks {
     trace_cuda_launch_kernel: None,
     trace_cuda_memcpy: None,
     trace_cuda_memcpy_ret: None,
+    tracepoint__syscalls__sys_enter_open: None,
+    tracepoint__syscalls__sys_enter_openat: None,
 };
 
 impl Gpuprobe {
@@ -231,6 +235,9 @@ impl Gpuprobe {
         }
         if self.opts.bandwidth_util {
             self.attach_bandwidth_util_uprobes()?;
+        }
+        if self.opts.deps {
+            self.attach_deps_tracepoints()?;
         }
 
         Ok(())

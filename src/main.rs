@@ -28,6 +28,11 @@ struct Args {
     #[arg(long, exclusive = false)]
     bandwidth_util: bool,
 
+    /// Attaches the dependency detection program: detect dynamic dependencies
+    /// of a running program.
+    #[arg(long, exclusive = false)]
+    deps: bool,
+
     /// Address for the Prometheus metrics endpoint.
     #[arg(long, default_value = "0.0.0.0:9000")]
     metrics_addr: String,
@@ -54,8 +59,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         memleak: args.memleak,
         cudatrace: args.cudatrace,
         bandwidth_util: args.bandwidth_util,
+        deps: args.deps,
         libcudart_path: args.libcudart_path,
     };
+
+    println!("deps: {}", opts.deps);
 
     let mut gpuprobe = gpuprobe::Gpuprobe::new(opts).unwrap();
     gpuprobe.attach_uprobes().unwrap();

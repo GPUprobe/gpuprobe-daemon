@@ -282,4 +282,43 @@ int trace_cuda_memcpy_ret(struct pt_regs *ctx)
 	return 0;
 }
 
+struct sys_enter_open_args {
+    unsigned long long unused;
+    long syscall_nr;
+    const char *filename;
+    long flags;
+    long mode;
+};
+
+SEC("tracepoint/syscalls/sys_enter_open")
+int tracepoint__syscalls__sys_enter_open(struct sys_enter_open_args* ctx)
+{
+    __u64 id = bpf_get_current_pid_tgid();
+    __u32 tgid = id >> 32;
+    __u32 pid = id;
+
+	bpf_printk("process_%d -> %s", pid, ctx->filename);
+    return 0;
+}
+
+struct sys_enter_openat_args {
+    unsigned long long unused;
+    long syscall_nr;
+    long dfd;
+    const char *filename;
+    long flags;
+    long mode;
+};
+
+SEC("tracepoint/syscalls/sys_enter_openat")
+int tracepoint__syscalls__sys_enter_openat(struct sys_enter_openat_args* ctx)
+{
+    __u64 id = bpf_get_current_pid_tgid();
+    __u32 tgid = id >> 32;
+    __u32 pid = id;
+	bpf_printk("process_%d -> %s", pid, ctx->filename);
+
+    return 0;
+}
+
 char LICENSE[] SEC("license") = "GPL";
