@@ -54,7 +54,7 @@ unsafe impl Sync for SafeGpuProbeObj {}
 /// Gpuuprobe wraps the eBPF program state, provides an interface for
 /// attaching relevant uprobes, and exporting their metrics.
 ///
-/// !!TODO!! maybe consider using orobouros self-referential instead of the
+/// TODO: maybe consider using orobouros self-referential instead of the
 /// static lifetime
 pub struct Gpuprobe {
     obj: SafeGpuProbeObj,

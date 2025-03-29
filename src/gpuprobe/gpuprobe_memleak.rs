@@ -152,13 +152,10 @@ impl MemleakState {
     ///     - number of failures
     fn handle_event(&mut self, data: MemleakEvent) -> Result<(), GpuprobeError> {
         self.active_pids.insert(data.pid.clone());
-        if data.is_error() {
-            // this case should be updated when we consume the memleak
-            // queue - a MemleakState only holds updates made by valid
-            // cudaMalloc / cudaFree calls
-            panic!("handle_event should not handle erroneous calls");
-        }
-
+        assert!(
+            !data.is_error(),
+            "handle_event(): should not handle failed Cuda calls"
+        );
         if data.event_type == MemleakEventType::CudaMalloc as i32 {
             if !self.memory_map.contains_key(&data.pid) {
                 self.memory_map.insert(data.pid, BTreeMap::new());
@@ -180,10 +177,11 @@ impl MemleakState {
             );
         } else if data.event_type == MemleakEventType::CudaFree as i32 {
             if !self.memory_map.contains_key(&data.pid) {
-                // Freeing data that isn't allocated. This represents a problem
-                // in the user code, or in our own tracking of memory
-                // allocations. It seems reasonable to want to panic here.
-                panic!("attempt to free unallocated memory - aborting");
+                // XXX: this is the user freeing memory that doesn't exist -
+                // It might be best to track this sort of thing and export it
+                // as a metric
+                println!("\x1b[33mWARN: cudaFree() called on unallocated region\x1b[0m\n");
+                return Ok(());
             }
 
             let memory_map = match self.memory_map.get_mut(&data.pid) {
@@ -254,8 +252,8 @@ impl MemleakState {
             use nix::sys::signal::kill;
             use nix::unistd::Pid;
 
-            // We send a kill signal with value 0 to the pid. This functions as
-            // an aliveness probe.
+            // We send a kill signal with value 0 to process identified by pid.
+            // This functions as an aliveness probe.
             match kill(Pid::from_raw(pid as i32), None) {
                 Ok(_) => Ok(false),
                 Err(nix::errno::Errno::ESRCH) => Ok(true),

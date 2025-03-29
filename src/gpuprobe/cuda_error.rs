@@ -35,7 +35,8 @@ impl ToString for EventType {
         match self {
             Self::CudaMalloc => "cudaMalloc",
             Self::CudaFree => "cudaFree",
-        }.to_string()
+        }
+        .to_string()
     }
 }
 
@@ -64,7 +65,7 @@ impl CudaErrorState {
 
         let hist = match self.error_histogram.get_mut(&err.pid) {
             Some(hist) => hist,
-            None => panic!("what"),
+            None => panic!("no entry for {} in histogram", err.pid),
         };
 
         let count_ref = match hist.get_mut(&(err.event, err.error)) {
