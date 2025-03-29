@@ -83,6 +83,7 @@ const DEFAULT_LINKS: GpuprobeLinks = GpuprobeLinks {
     trace_cuda_free: None,
     trace_cuda_free_ret: None,
     trace_cuda_launch_kernel: None,
+    trace_cuda_launch_kernel_ret: None,
     trace_cuda_memcpy: None,
     trace_cuda_memcpy_ret: None,
 };
