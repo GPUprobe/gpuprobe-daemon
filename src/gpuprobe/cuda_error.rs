@@ -83,10 +83,15 @@ impl CudaErrorState {
 impl std::fmt::Display for CudaErrorState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "per-process error histograms:")?;
-        for (pid, hash_map) in self.error_histogram.iter() {
-            writeln!(f, "process {}", pid)?;
-            for ((event, error), count) in hash_map {
-                writeln!(f, "\t({}[{:?}]): {}", event.to_string(), error, count)?;
+
+        if self.error_histogram.is_empty() {
+            println!("\tNo errors to report");
+        } else {
+            for (pid, hash_map) in self.error_histogram.iter() {
+                writeln!(f, "process {}", pid)?;
+                for ((event, error), count) in hash_map {
+                    writeln!(f, "\t({}[{:?}]): {}", event.to_string(), error, count)?;
+                }
             }
         }
 

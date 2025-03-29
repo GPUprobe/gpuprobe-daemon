@@ -266,11 +266,16 @@ impl MemleakState {
 impl std::fmt::Display for MemleakState {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "per-process memory maps:")?;
-        for (pid, b_tree_map) in self.memory_map.iter() {
-            writeln!(f, "process {}", pid)?;
 
-            for (_, alloc) in b_tree_map.iter() {
-                writeln!(f, "\t{alloc}")?;
+        if self.memory_map.is_empty() {
+            writeln!(f, "\tNo allocations on GPU")?;
+        } else {
+            for (pid, b_tree_map) in self.memory_map.iter() {
+                writeln!(f, "process {}", pid)?;
+
+                for (_, alloc) in b_tree_map.iter() {
+                    writeln!(f, "\t{alloc}")?;
+                }
             }
         }
         writeln!(f)
