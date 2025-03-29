@@ -7,7 +7,7 @@ use super::GpuprobeError;
 #[repr(i32)]
 #[derive(std::cmp::PartialEq, std::cmp::Eq, std::hash::Hash, Clone, Copy, Debug)]
 pub enum CudaErrorT {
-    CudaSuccess,
+    CudaSuccess = 0,
     CudaErrorInvalidValue,
     CudaErrorMemoryAllocation,
     UnsupportedErrorType,
@@ -28,6 +28,7 @@ impl CudaErrorT {
 pub enum EventType {
     CudaMalloc,
     CudaFree,
+    CudaLaunchKernel,
 }
 
 impl ToString for EventType {
@@ -35,6 +36,7 @@ impl ToString for EventType {
         match self {
             Self::CudaMalloc => "cudaMalloc",
             Self::CudaFree => "cudaFree",
+            Self::CudaLaunchKernel => "cudaLaunchKernel",
         }
         .to_string()
     }

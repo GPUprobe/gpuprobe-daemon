@@ -100,22 +100,18 @@ impl Gpuprobe {
                 }
             };
 
-            match event.is_error() {
-                false => {
-                    self.glob_process_table.create_entry(event.pid)?;
-                    self.memleak_state.handle_event(event)?;
-                }
-                true => {
-                    let err = CudaError {
-                        pid: event.pid,
-                        event: match event.event_type {
-                            0 => super::cuda_error::EventType::CudaMalloc,
-                            _ => super::cuda_error::EventType::CudaFree,
-                        },
-                        error: CudaErrorT::from_int(event.ret),
-                    };
-                    self.err_state.insert(err)?;
-                }
+            if event.is_error() {
+                self.err_state.insert(CudaError {
+                    pid: event.pid,
+                    event: match event.event_type {
+                        0 => super::cuda_error::EventType::CudaMalloc,
+                        _ => super::cuda_error::EventType::CudaFree,
+                    },
+                    error: CudaErrorT::from_int(event.ret),
+                })?;
+            } else {
+                self.glob_process_table.create_entry(event.pid)?;
+                self.memleak_state.handle_event(event)?;
             }
         }
         Ok(())

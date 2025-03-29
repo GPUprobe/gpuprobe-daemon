@@ -9,7 +9,10 @@ use std::collections::{BTreeMap, HashMap};
 
 use libbpf_rs::{MapCore, UprobeOpts};
 
-use super::{Gpuprobe, GpuprobeError};
+use super::{
+    cuda_error::{CudaError, CudaErrorT, EventType},
+    Gpuprobe, GpuprobeError,
+};
 
 /// contains implementations for the cudatrace program
 impl Gpuprobe {
@@ -22,6 +25,12 @@ impl Gpuprobe {
             ..Default::default()
         };
 
+        let opts_launch_kernel_ret = UprobeOpts {
+            func_name: "cudaLaunchKernel".to_string(),
+            retprobe: true,
+            ..Default::default()
+        };
+
         let cuda_launch_kernel_uprobe_link = self
             .skel
             .skel
@@ -30,7 +39,16 @@ impl Gpuprobe {
             .attach_uprobe_with_opts(-1, &self.opts.libcudart_path, 0, opts_launch_kernel)
             .map_err(|_| GpuprobeError::AttachError)?;
 
+        let cuda_launch_kernel_uretprobe_link = self
+            .skel
+            .skel
+            .progs
+            .trace_cuda_launch_kernel_ret
+            .attach_uprobe_with_opts(-1, &self.opts.libcudart_path, 0, opts_launch_kernel_ret)
+            .map_err(|_| GpuprobeError::AttachError)?;
+
         self.links.links.trace_cuda_launch_kernel = Some(cuda_launch_kernel_uprobe_link);
+        self.links.links.trace_cuda_launch_kernel_ret = Some(cuda_launch_kernel_uretprobe_link);
         Ok(())
     }
 
@@ -60,8 +78,18 @@ impl Gpuprobe {
                     ));
                 }
             };
-            self.glob_process_table.create_entry(event.pid)?;
-            self.cudatrace_state.handle_event(event)?;
+
+            if event.is_error() {
+                println!("error-code = {}", event.ret);
+                self.err_state.insert(CudaError {
+                    pid: event.pid,
+                    event: EventType::CudaLaunchKernel,
+                    error: CudaErrorT::from_int(event.ret),
+                })?;
+            } else {
+                self.glob_process_table.create_entry(event.pid)?;
+                self.cudatrace_state.handle_event(event)?;
+            }
         }
 
         Ok(())
@@ -117,9 +145,11 @@ impl CudatraceState {
 }
 
 struct KernelLaunchEvent {
-    timestamp: u64,
+    start: u64,
+    end: u64,
     kern_offset: u64,
     pid: u32,
+    ret: i32,
 }
 
 impl KernelLaunchEvent {
@@ -133,5 +163,10 @@ impl KernelLaunchEvent {
         // 1. The byte array contains valid data for this struct
         // 2. The byte array is at least as large as the struct
         unsafe { Some(std::ptr::read_unaligned(bytes.as_ptr() as *const Self)) }
+    }
+
+    /// Return true iff the event is an error
+    pub fn is_error(&self) -> bool {
+        self.ret != CudaErrorT::CudaSuccess as i32
     }
 }

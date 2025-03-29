@@ -64,7 +64,7 @@ int memleak_cuda_malloc(struct pt_regs *ctx)
 	__u32 pid, key0 = 0;
 
 	e.size = (__u64)PT_REGS_PARM2(ctx);
-	dev_ptr = (__u64) PT_REGS_PARM1(ctx);
+	dev_ptr = (__u64)PT_REGS_PARM1(ctx);
 	pid = (__u32)bpf_get_current_pid_tgid();
 
 	e.event_type = CUDA_MALLOC;
@@ -102,10 +102,11 @@ int memleak_cuda_malloc_ret(struct pt_regs *ctx)
 	if (!map_ptr) {
 		return -1;
 	}
-	dev_ptr = *(__u64*)map_ptr;
+	dev_ptr = *(__u64 *)map_ptr;
 
 	// read the value copied into `*devPtr` by `cudaMalloc` from userspace
-	if (bpf_probe_read_user(&e->device_addr, sizeof(void *), (void*)dev_ptr)) {
+	if (bpf_probe_read_user(&e->device_addr, sizeof(void *),
+				(void *)dev_ptr)) {
 		return -1;
 	}
 
@@ -151,9 +152,11 @@ int trace_cuda_free_ret(struct pt_regs *ctx)
 }
 
 struct kernel_launch_event {
-	__u64 timestamp;
+	__u64 start; //< timestamp
+	__u64 end; //< timestamp
 	__u64 kern_offset;
 	__u32 pid;
+	__s32 ret;
 };
 
 struct {
@@ -163,17 +166,46 @@ struct {
 	__uint(max_entries, 10240);
 } kernel_launch_events_queue SEC(".maps");
 
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__type(key, __u32);
+	__type(value, struct kernel_launch_event);
+	__uint(max_entries, 1024);
+} kernel_launch_pid_to_event SEC(".maps");
+
 SEC("uprobe/cudaKernelLaunch")
 int trace_cuda_launch_kernel(struct pt_regs *ctx)
 {
 	struct kernel_launch_event e;
-	void *kern_offset;
 
-	e.timestamp = bpf_ktime_get_ns();
+	e.start = bpf_ktime_get_ns();
 	e.kern_offset = (__u64)PT_REGS_PARM1(ctx);
 	e.pid = (__u32)bpf_get_current_pid_tgid();
 
-	return bpf_map_push_elem(&kernel_launch_events_queue, &e, 0);
+	return bpf_map_update_elem(&kernel_launch_pid_to_event, &e.pid, &e, 0);
+}
+
+SEC("uretprobe/cudaKernelLaunch")
+int trace_cuda_launch_kernel_ret(struct pt_regs *ctx)
+{
+	bpf_printk("called kernel launch uretprobe\n");
+	struct kernel_launch_event *e;
+	__u32 pid;
+
+	pid = (__u32)bpf_get_current_pid_tgid();
+	e = bpf_map_lookup_elem(&kernel_launch_pid_to_event, &pid);
+
+	if (!e || e->pid != pid)
+		return -1;
+
+	e->ret = (__s32)PT_REGS_RC(ctx);
+	e->end = bpf_ktime_get_ns();
+
+	__s32 ret = bpf_map_push_elem(&kernel_launch_events_queue, e, 0);
+	if (ret != 0) {
+		bpf_printk("call failed\n");
+	}
+	return ret;
 }
 
 /**
